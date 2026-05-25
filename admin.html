@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IslaPoint · Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#0746a8;--blue-dark:#05337a;--bg:#f0f4fa;--text:#1a2a4a;
+  --muted:#6b7a90;--green:#1db87a;--red:#e5534b;--white:#fff;
+  --border:#e4eaf3;--header:60px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#05337a,#0746a8 50%,#1a5fcc);display:flex;align-items:center;justify-content:center}
+#loginScreen.hidden{display:none}
+.login-box{background:#fff;border-radius:20px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 24px 80px rgba(5,51,122,.35);animation:fadeIn .4s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.login-brand{text-align:center;margin-bottom:28px}
+.login-brand h1{font-family:'DM Serif Display',serif;font-size:1.8rem;background:linear-gradient(135deg,#0746a8,#1a5fcc);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-brand p{font-size:.72rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:4px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field input{width:100%;padding:12px 14px;border:1.5px solid #dce4ec;border-radius:10px;font-size:.95rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--bg);transition:border-color .2s}
+.field input:focus{border-color:var(--blue)}
+.field input.error{border-color:var(--red);animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.login-error{color:var(--red);font-size:.8rem;margin-bottom:12px;display:none;text-align:center}
+.login-error.show{display:block}
+.btn-primary{width:100%;padding:13px;background:linear-gradient(135deg,#0746a8,#1a5fcc);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity .2s}
+.btn-primary:hover{opacity:.9}
+.btn-sm{padding:6px 14px;border-radius:8px;font-size:.8rem;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;border:none;transition:all .15s}
+.btn-blue{background:var(--blue);color:#fff}
+.btn-blue:hover{background:var(--blue-dark)}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{opacity:.85}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{opacity:.85}
+.btn-gray{background:#e4eaf3;color:var(--text)}
+.btn-gray:hover{background:#d4daea}
+
+/* APP */
+#app{display:none;flex-direction:column;min-height:100vh}
+#app.show{display:flex}
+
+/* Header */
+header{height:var(--header);background:linear-gradient(135deg,#05337a,#0746a8 60%,#1a5fcc);display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:0 3px 14px rgba(7,70,168,.3);flex-shrink:0;position:sticky;top:0;z-index:100}
+.h-brand h2{font-size:1rem;font-weight:700;color:#fff}
+.h-brand p{font-size:.62rem;letter-spacing:1.5px;color:rgba(255,255,255,.6);text-transform:uppercase}
+.h-tabs{display:flex;gap:4px}
+.h-tab{padding:7px 16px;border-radius:8px;font-size:.82rem;font-weight:600;color:rgba(255,255,255,.7);cursor:pointer;border:none;background:transparent;font-family:'DM Sans',sans-serif;transition:all .15s}
+.h-tab.active{background:rgba(255,255,255,.2);color:#fff}
+.h-tab:hover{background:rgba(255,255,255,.15);color:#fff}
+.btn-logout-sm{padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:20px;font-size:.78rem;font-family:'DM Sans',sans-serif;cursor:pointer}
+
+/* Content */
+.content{flex:1;padding:24px;max-width:1200px;margin:0 auto;width:100%}
+
+/* Panel */
+.panel{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(7,70,168,.07);overflow:hidden}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.panel-title{font-size:1rem;font-weight:700;color:var(--text)}
+.panel-body{padding:20px}
+
+/* Search */
+.search-row{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-input{flex:1;min-width:200px;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--bg)}
+.search-input:focus{border-color:var(--blue)}
+select.search-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7a90'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+
+/* Table */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+th{padding:10px 12px;text-align:left;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--border);background:#f8fafd;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #f0f4fa;vertical-align:middle}
+tr:hover td{background:#f8fafd}
+.td-foto{width:48px}
+.local-foto{width:40px;height:40px;object-fit:cover;border-radius:6px;background:#eef1f6}
+.foto-placeholder{width:40px;height:40px;border-radius:6px;background:#eef1f6;display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:#aab}
+.td-nombre{font-weight:600;max-width:160px}
+.td-actions{white-space:nowrap;display:flex;gap:6px;align-items:center}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:700}
+.badge-activo{background:#d4f5e7;color:#0a7a4a}
+.badge-noactivo{background:#fde8e8;color:#c0392b}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(7,30,80,.6);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:1}
+.modal-title{font-size:1rem;font-weight:700}
+.modal-close{background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--muted);padding:4px}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;position:sticky;bottom:0;background:#fff}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select,.form-group textarea{padding:9px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--bg);transition:border-color .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--blue)}
+.form-group textarea{resize:vertical;min-height:60px}
+
+/* Foto upload */
+.foto-upload-area{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg)}
+.foto-upload-area:hover{border-color:var(--blue);background:#f0f5ff}
+.foto-preview{width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:10px;display:none}
+.foto-upload-text{font-size:.82rem;color:var(--muted)}
+.foto-upload-text strong{color:var(--blue)}
+
+/* Usuarios */
+.user-card{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;gap:10px}
+.user-info{flex:1}
+.user-name{font-weight:600;font-size:.9rem}
+.user-meta{font-size:.75rem;color:var(--muted);margin-top:2px}
+.user-actions{display:flex;gap:6px}
+
+/* Loading */
+#loading{position:fixed;inset:0;background:rgba(7,70,168,.65);display:flex;align-items:center;justify-content:center;z-index:9000}
+#loading.hidden{display:none}
+.spinner{width:38px;height:38px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a4a;color:#fff;padding:10px 22px;border-radius:20px;font-size:.82rem;opacity:0;transition:all .3s;z-index:9999;pointer-events:none;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(7,70,168,.06);text-align:center}
+.stat-num{font-size:1.8rem;font-weight:700;color:var(--blue)}
+.stat-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr}
+  .form-group.full{grid-column:1}
+  .h-tabs{display:none}
+  .content{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div></div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-brand">
+      <h1>IslaPoint</h1>
+      <p>Panel de administración</p>
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="adminPass" placeholder="••••••" onkeydown="if(event.key==='Enter')doAdminLogin()">
+    </div>
+    <div class="login-error" id="loginError">Contraseña incorrecta.</div>
+    <button class="btn-primary" onclick="doAdminLogin()">Acceder</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <div class="h-brand">
+      <h2>IslaPoint Admin</h2>
+      <p>Panel de administración</p>
+    </div>
+    <div class="h-tabs">
+      <button class="h-tab active" onclick="showTab('locales')">🏪 Locales</button>
+      <button class="h-tab" onclick="showTab('usuarios')">👥 Usuarios</button>
+    </div>
+    <button class="btn-logout-sm" onclick="doLogout()">Cerrar sesión</button>
+  </header>
+
+  <div class="content">
+
+    <!-- TAB LOCALES -->
+    <div id="tabLocales">
+      <div class="stats-row" id="statsRow"></div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Establecimientos</span>
+          <button class="btn-sm btn-green" onclick="openModalNuevo()">＋ Nuevo local</button>
+        </div>
+        <div class="panel-body">
+          <div class="search-row">
+            <input class="search-input" type="text" id="searchLocales" placeholder="Buscar por nombre..." oninput="filterLocales()">
+            <select class="search-input" id="searchCalle" onchange="filterLocales()" style="max-width:180px">
+              <option value="">Todas las calles</option>
+              <option value="C/ Real">C/ Real</option>
+              <option value="C/ Rosario">C/ Rosario</option>
+              <option value="C/ San Rafael">C/ San Rafael</option>
+            </select>
+            <select class="search-input" id="searchEstado" onchange="filterLocales()" style="max-width:150px">
+              <option value="">Todos los estados</option>
+              <option value="Activo">Activo</option>
+              <option value="No activo">No activo</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th class="td-foto">Foto</th>
+                  <th>Nombre</th>
+                  <th>Actividad</th>
+                  <th>Calle</th>
+                  <th>Nº</th>
+                  <th>Fachada</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tablaLocales"></tbody>
+            </table>
+          </div>
+          <div id="tablaPager" style="margin-top:12px;text-align:center;font-size:.8rem;color:var(--muted)"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB USUARIOS -->
+    <div id="tabUsuarios" style="display:none">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Gestión de usuarios</span>
+          <button class="btn-sm btn-green" onclick="openModalUsuario()">＋ Nuevo usuario</button>
+        </div>
+        <div class="panel-body">
+          <div id="listaUsuarios"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL EDITAR / NUEVO LOCAL -->
+<div class="modal-overlay" id="modalLocal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalLocalTitle">Editar local</span>
+      <button class="modal-close" onclick="closeModal('modalLocal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label>Nombre</label>
+          <input type="text" id="fNombre">
+        </div>
+        <div class="form-group">
+          <label>Actividad</label>
+          <input type="text" id="fActividad" list="actividadesList">
+          <datalist id="actividadesList"></datalist>
+        </div>
+        <div class="form-group">
+          <label>Estado</label>
+          <select id="fEstado">
+            <option value="Activo">Activo</option>
+            <option value="No activo">No activo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Calle</label>
+          <select id="fCalle">
+            <option value="C/ Real">C/ Real</option>
+            <option value="C/ Rosario">C/ Rosario</option>
+            <option value="C/ San Rafael">C/ San Rafael</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número</label>
+          <input type="text" id="fNumero">
+        </div>
+        <div class="form-group">
+          <label>Fachada (m)</label>
+          <input type="number" step="0.1" id="fFachada">
+        </div>
+        <div class="form-group full">
+          <label>Coordenadas (lat, lng)</label>
+          <input type="text" id="fCoordenadas" placeholder="36.4676, -6.1972">
+        </div>
+        <div class="form-group full">
+          <label>Foto</label>
+          <div class="foto-upload-area" onclick="document.getElementById('fFotoFile').click()" id="fotoUploadArea">
+            <img id="fFotoPreview" class="foto-preview" src="" alt="preview">
+            <div class="foto-upload-text" id="fotoUploadText">
+              <strong>Clic para subir foto</strong> o tomar con cámara<br>
+              <span style="font-size:.75rem">JPG, PNG — máx 5MB</span>
+            </div>
+          </div>
+          <input type="file" id="fFotoFile" accept="image/*" capture="environment" style="display:none" onchange="previewFoto(event)">
+          <button type="button" id="btnQuitarFoto" class="btn-sm btn-red" style="margin-top:8px;display:none" onclick="quitarFoto()">🗑️ Quitar foto</button>
+          <div id="fFotoUrlActual" style="font-size:.72rem;color:var(--muted);margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-gray" onclick="closeModal('modalLocal')">Cancelar</button>
+      <button class="btn-sm btn-blue" id="btnGuardarLocal" onclick="guardarLocal()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAR BORRAR -->
+<div class="modal-overlay" id="modalConfirm">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title">Confirmar eliminación</span>
+      <button class="modal-close" onclick="closeModal('modalConfirm')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.9rem">¿Seguro que quieres eliminar <strong id="confirmNombre"></strong>? Esta acción no se puede deshacer.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-gray" onclick="closeModal('modalConfirm')">Cancelar</button>
+      <button class="btn-sm btn-red" id="btnConfirmBorrar">🗑️ Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO/EDITAR USUARIO -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <span class="modal-title" id="modalUsuarioTitle">Nuevo usuario</span>
+      <button class="modal-close" onclick="closeModal('modalUsuario')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <div class="form-group">
+          <label>Nombre de usuario</label>
+          <input type="text" id="uNombre" placeholder="nombre">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="text" id="uClave" placeholder="clave de acceso">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-gray" onclick="closeModal('modalUsuario')">Cancelar</button>
+      <button class="btn-sm btn-blue" onclick="guardarUsuario()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://fmdzzpvwcocgycabdtsm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_wXkbrZr3OhMEF35axgxI3Q_Q9h4BMyf';
+const ADMIN_PASS   = '1234';
+const BUCKET       = 'FOTOS LOCALES';
+
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let locales = [], usuariosData = [], editingId = null, fotoNueva = null;
+const PAGE_SIZE = 30;
+let currentPage = 0, filteredLocales = [];
+
+// ── LOGIN ─────────────────────────────────────────────────────
+function doAdminLogin() {
+  const pass = document.getElementById('adminPass').value;
+  const errEl = document.getElementById('loginError');
+  if (pass === ADMIN_PASS) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.add('show');
+    initApp();
+  } else {
+    errEl.classList.add('show');
+    const el = document.getElementById('adminPass');
+    el.classList.add('error');
+    el.value = '';
+    setTimeout(() => el.classList.remove('error'), 500);
+  }
+}
+
+function doLogout() {
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('adminPass').value = '';
+  document.getElementById('loginError').classList.remove('show');
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+async function initApp() {
+  showLoading(true);
+  await Promise.all([loadLocales(), loadUsuarios()]);
+  showLoading(false);
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function showTab(tab) {
+  document.getElementById('tabLocales').style.display  = tab === 'locales'  ? '' : 'none';
+  document.getElementById('tabUsuarios').style.display = tab === 'usuarios' ? '' : 'none';
+  document.querySelectorAll('.h-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='locales')||(i===1&&tab==='usuarios')));
+}
+
+// ── LOCALES ───────────────────────────────────────────────────
+async function loadLocales() {
+  const { data, error } = await _sb.from('locales').select('*').order('nombre');
+  if (error) { toast('Error cargando locales: ' + error.message); return; }
+  locales = data || [];
+  filteredLocales = [...locales];
+  renderStats();
+  renderTabla();
+  buildActividadesList();
+}
+
+function renderStats() {
+  const total   = locales.length;
+  const activos = locales.filter(l => l.estado === 'Activo').length;
+  const conFoto = locales.filter(l => l.foto_url && l.foto_url !== 'EMPTY').length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total locales</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--green)">${activos}</div><div class="stat-label">Activos</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--red)">${total-activos}</div><div class="stat-label">No activos</div></div>
+    <div class="stat-card"><div class="stat-num">${conFoto}</div><div class="stat-label">Con foto</div></div>`;
+}
+
+function buildActividadesList() {
+  const acts = [...new Set(locales.map(l => l.actividad).filter(Boolean))].sort();
+  document.getElementById('actividadesList').innerHTML = acts.map(a => `<option value="${a}">`).join('');
+}
+
+function filterLocales() {
+  const buscar = document.getElementById('searchLocales').value.toLowerCase();
+  const calle  = document.getElementById('searchCalle').value;
+  const estado = document.getElementById('searchEstado').value;
+  filteredLocales = locales.filter(l => {
+    if (buscar && !(l.nombre||'').toLowerCase().includes(buscar)) return false;
+    if (calle  && l.calle !== calle) return false;
+    if (estado && l.estado !== estado) return false;
+    return true;
+  });
+  currentPage = 0;
+  renderTabla();
+}
+
+function renderTabla() {
+  const start = currentPage * PAGE_SIZE;
+  const page  = filteredLocales.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('tablaLocales');
+  tbody.innerHTML = '';
+  page.forEach(l => {
+    const activo = l.estado === 'Activo';
+    const fotoHtml = (l.foto_url && l.foto_url !== 'EMPTY')
+      ? `<img class="local-foto" src="${l.foto_url}" onerror="this.style.display='none'">`
+      : `<div class="foto-placeholder">🏪</div>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="td-foto">${fotoHtml}</td>
+      <td class="td-nombre">${l.nombre||'—'}</td>
+      <td>${l.actividad||'—'}</td>
+      <td>${l.calle||'—'}</td>
+      <td>${(l.numero||'').replace(/\.0$/,'')}</td>
+      <td>${l.fachada||'—'} m</td>
+      <td><span class="badge ${activo?'badge-activo':'badge-noactivo'}">${l.estado||'—'}</span></td>
+      <td>
+        <div class="td-actions">
+          <button class="btn-sm btn-blue" onclick="openModalEditar('${l.id}')">✏️ Editar</button>
+          <button class="btn-sm btn-red"  onclick="confirmarBorrar('${l.id}','${(l.nombre||'').replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Paginación
+  const total = filteredLocales.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const pager = document.getElementById('tablaPager');
+  if (pages > 1) {
+    pager.innerHTML = `Página ${currentPage+1} de ${pages} · ${total} registros &nbsp;
+      <button class="btn-sm btn-gray" onclick="changePage(-1)" ${currentPage===0?'disabled':''}>◀</button> &nbsp;
+      <button class="btn-sm btn-gray" onclick="changePage(1)"  ${currentPage>=pages-1?'disabled':''}>▶</button>`;
+  } else {
+    pager.textContent = `${total} registros`;
+  }
+}
+
+function changePage(dir) {
+  const pages = Math.ceil(filteredLocales.length / PAGE_SIZE);
+  currentPage = Math.max(0, Math.min(pages-1, currentPage + dir));
+  renderTabla();
+}
+
+// ── MODAL LOCAL ───────────────────────────────────────────────
+function openModalNuevo() {
+  editingId = null;
+  fotoNueva = null;
+  document.getElementById('modalLocalTitle').textContent = '➕ Nuevo local';
+  document.getElementById('fNombre').value      = '';
+  document.getElementById('fActividad').value   = '';
+  document.getElementById('fEstado').value      = 'Activo';
+  document.getElementById('fCalle').value       = 'C/ Real';
+  document.getElementById('fNumero').value      = '';
+  document.getElementById('fFachada').value     = '';
+  document.getElementById('fCoordenadas').value = '';
+  document.getElementById('fFotoPreview').style.display = 'none';
+  document.getElementById('fFotoFile').value    = '';
+  document.getElementById('fFotoUrlActual').textContent = '';
+  document.getElementById('btnQuitarFoto').style.display = 'none';
+  document.getElementById('fotoUploadText').style.display = 'block';
+  document.getElementById('modalLocal').classList.add('open');
+}
+
+function openModalEditar(id) {
+  const l = locales.find(x => String(x.id) === String(id));
+  if (!l) return;
+  editingId = id;
+  fotoNueva = null;
+  document.getElementById('modalLocalTitle').textContent = `✏️ Editar: ${l.nombre}`;
+  document.getElementById('fNombre').value      = l.nombre     || '';
+  document.getElementById('fActividad').value   = l.actividad  || '';
+  document.getElementById('fEstado').value      = l.estado     || 'Activo';
+  document.getElementById('fCalle').value       = l.calle      || 'C/ Real';
+  document.getElementById('fNumero').value      = (l.numero||'').replace(/\.0$/,'');
+  document.getElementById('fFachada').value     = l.fachada    || '';
+  document.getElementById('fCoordenadas').value = l.coordenadas|| '';
+  document.getElementById('fFotoFile').value    = '';
+  fotoNueva = null;
+
+  const preview = document.getElementById('fFotoPreview');
+  const uploadText = document.getElementById('fotoUploadText');
+  const btnQuitar = document.getElementById('btnQuitarFoto');
+  if (l.foto_url && l.foto_url !== 'EMPTY') {
+    preview.src = l.foto_url;
+    preview.style.display = 'block';
+    uploadText.style.display = 'none';
+    document.getElementById('fFotoUrlActual').textContent = 'Foto actual guardada';
+    btnQuitar.style.display = 'inline-block';
+  } else {
+    preview.style.display = 'none';
+    uploadText.style.display = 'block';
+    document.getElementById('fFotoUrlActual').textContent = 'Sin foto';
+    btnQuitar.style.display = 'none';
+  }
+  document.getElementById('modalLocal').classList.add('open');
+}
+
+function quitarFoto() {
+  fotoNueva = null;
+  document.getElementById('fFotoFile').value = '';
+  document.getElementById('fFotoPreview').style.display = 'none';
+  document.getElementById('fotoUploadText').style.display = 'block';
+  document.getElementById('fFotoUrlActual').textContent = 'Sin foto (se eliminará al guardar)';
+  document.getElementById('btnQuitarFoto').style.display = 'none';
+  // Marcar que hay que borrar la foto al guardar
+  fotoNueva = '__DELETE__';
+}
+
+function previewFoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  fotoNueva = file;
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('fFotoPreview');
+  preview.src = url;
+  preview.style.display = 'block';
+  document.getElementById('fotoUploadText').style.display = 'none';
+  document.getElementById('fFotoUrlActual').textContent = `Nueva foto: ${file.name}`;
+  document.getElementById('btnQuitarFoto').style.display = 'inline-block';
+}
+
+async function guardarLocal() {
+  const btn = document.getElementById('btnGuardarLocal');
+  btn.disabled = true;
+  btn.textContent = '⏳ Guardando...';
+
+  try {
+    let foto_url = null;
+
+    // Subir foto si hay nueva
+    if (fotoNueva && fotoNueva !== '__DELETE__') {
+      toast('📤 Subiendo foto...');
+      const ext = fotoNueva.name.split('.').pop();
+      const fileName = `local_${Date.now()}.${ext}`;
+      const { data: upData, error: upErr } = await _sb.storage
+        .from(BUCKET)
+        .upload(fileName, fotoNueva, { upsert: true, contentType: fotoNueva.type });
+      if (upErr) throw new Error('Error subiendo foto: ' + upErr.message);
+      const { data: urlData } = _sb.storage.from(BUCKET).getPublicUrl(fileName);
+      foto_url = urlData.publicUrl;
+    }
+
+    const row = {
+      nombre:      document.getElementById('fNombre').value.trim(),
+      actividad:   document.getElementById('fActividad').value.trim(),
+      estado:      document.getElementById('fEstado').value,
+      calle:       document.getElementById('fCalle').value,
+      numero:      document.getElementById('fNumero').value.trim(),
+      fachada:     parseFloat(document.getElementById('fFachada').value) || null,
+      coordenadas: document.getElementById('fCoordenadas').value.trim(),
+    };
+    if (fotoNueva === '__DELETE__') { row.foto_url = null; fotoNueva = null; }
+    if (foto_url) row.foto_url = foto_url;
+
+    if (editingId) {
+      const { error } = await _sb.from('locales').update(row).eq('id', String(editingId));
+      if (error) throw error;
+      toast('✅ Local actualizado');
+    } else {
+      const { error } = await _sb.from('locales').insert([row]);
+      if (error) throw error;
+      toast('✅ Local creado');
+    }
+
+    closeModal('modalLocal');
+    await loadLocales();
+  } catch(e) {
+    toast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar';
+  }
+}
+
+// ── BORRAR ────────────────────────────────────────────────────
+function confirmarBorrar(id, nombre) {
+  document.getElementById('confirmNombre').textContent = nombre;
+  document.getElementById('btnConfirmBorrar').onclick = () => borrarLocal(id);
+  document.getElementById('modalConfirm').classList.add('open');
+}
+
+async function borrarLocal(id) {
+  showLoading(true);
+  const { error } = await _sb.from('locales').delete().eq('id', String(id));
+  showLoading(false);
+  if (error) { toast('❌ ' + error.message); return; }
+  closeModal('modalConfirm');
+  toast('🗑️ Local eliminado');
+  await loadLocales();
+}
+
+// ── USUARIOS ──────────────────────────────────────────────────
+async function loadUsuarios() {
+  const { data, error } = await _sb.from('usuarios').select('*').order('id');
+  if (error) return;
+  usuariosData = data || [];
+  renderUsuarios();
+}
+
+function renderUsuarios() {
+  const cont = document.getElementById('listaUsuarios');
+  cont.innerHTML = '';
+  usuariosData.forEach(u => {
+    const div = document.createElement('div');
+    div.className = 'user-card';
+    div.innerHTML = `
+      <div class="user-info">
+        <div class="user-name">👤 ${u.nombre}</div>
+        <div class="user-meta">Clave: ${u.clave} · ${u.activo ? '✅ Activo' : '❌ Desactivado'} · Creado: ${new Date(u.creado_en).toLocaleDateString('es-ES')}</div>
+      </div>
+      <div class="user-actions">
+        <button class="btn-sm ${u.activo?'btn-red':'btn-green'}" onclick="toggleUsuario(${u.id},${u.activo})">
+          ${u.activo ? '🔒 Desactivar' : '🔓 Activar'}
+        </button>
+        ${u.nombre !== 'admin' ? `<button class="btn-sm btn-gray" onclick="borrarUsuario(${u.id},'${u.nombre}')">🗑️</button>` : ''}
+      </div>`;
+    cont.appendChild(div);
+  });
+}
+
+function openModalUsuario() {
+  document.getElementById('uNombre').value = '';
+  document.getElementById('uClave').value  = '';
+  document.getElementById('modalUsuario').classList.add('open');
+}
+
+async function guardarUsuario() {
+  const nombre = document.getElementById('uNombre').value.trim();
+  const clave  = document.getElementById('uClave').value.trim();
+  if (!nombre || !clave) { toast('⚠️ Rellena nombre y clave'); return; }
+  const { error } = await _sb.from('usuarios').insert([{ nombre, clave, activo: true }]);
+  if (error) { toast('❌ ' + error.message); return; }
+  closeModal('modalUsuario');
+  toast('✅ Usuario creado');
+  await loadUsuarios();
+}
+
+async function toggleUsuario(id, activo) {
+  const { error } = await _sb.from('usuarios').update({ activo: !activo }).eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  toast(activo ? '🔒 Usuario desactivado' : '🔓 Usuario activado');
+  await loadUsuarios();
+}
+
+async function borrarUsuario(id, nombre) {
+  if (!confirm(`¿Eliminar usuario "${nombre}"?`)) return;
+  const { error } = await _sb.from('usuarios').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  toast('🗑️ Usuario eliminado');
+  await loadUsuarios();
+}
+
+// ── UTILIDADES ────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function showLoading(v) { document.getElementById('loading').classList.toggle('hidden', !v); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ARRANQUE
+(function() { showLoading(false); })();
+</script>
+</body>
+</html>
