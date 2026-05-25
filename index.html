@@ -110,7 +110,7 @@ select.filter-input{cursor:pointer;appearance:none;background-image:url("data:im
 .status-noactivo{color:var(--red)}
 
 /* Map */
-#map{flex:1;z-index:1}
+#map{flex:1;z-index:1;min-height:0;height:100%}
 
 /* Card */
 #card{
@@ -464,21 +464,8 @@ function toast(msg) {
 }
 
 // ARRANQUE
-(async function() {
+(function() {
   showLoading(false);
-  const saved = sessionStorage.getItem('islapoint_user');
-  if (saved) {
-    try {
-      const u = JSON.parse(saved);
-      const { data, error } = await _sb.from('usuarios').select('*').eq('id', u.id).eq('activo', true);
-      if (!error && data && data.length > 0) {
-        sessionUser = data[0];
-        await initApp();
-        return;
-      }
-    } catch(e) {}
-    sessionStorage.removeItem('islapoint_user');
-  }
 })();
 </script>
 </body>
