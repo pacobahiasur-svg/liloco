@@ -329,6 +329,8 @@ async function initApp() {
   filtrados = [...locales];
   render();
   showLoading(false);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 600);
 }
 
 // CARGAR LOCALES
