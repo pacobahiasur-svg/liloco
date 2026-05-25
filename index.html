@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>IslaPoint · San Fernando</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#0746a8;--blue-dark:#05337a;--blue-mid:#1a5fcc;
+  --white:#fff;--bg:#f0f4fa;--text:#1a2a4a;--muted:#6b7a90;
+  --green:#1db87a;--red:#e5534b;--sidebar:320px;--header:60px;
+}
+body{font-family:'DM Sans',sans-serif;height:100vh;overflow:hidden;background:var(--bg);color:var(--text)}
+
+/* LOGIN */
+#loginScreen{
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#05337a 0%,#0746a8 50%,#1a5fcc 100%);
+  display:flex;align-items:center;justify-content:center;
+}
+#loginScreen.hidden{display:none}
+.login-box{
+  background:#fff;border-radius:20px;padding:40px 36px 36px;
+  width:100%;max-width:400px;box-shadow:0 24px 80px rgba(5,51,122,.35);
+  animation:loginIn .4s ease;
+}
+@keyframes loginIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.login-brand{text-align:center;margin-bottom:28px}
+.login-brand h1{
+  font-family:'DM Serif Display',serif;font-size:2rem;
+  background:linear-gradient(135deg,#0746a8,#1a5fcc);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px;
+}
+.login-brand p{font-size:.75rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.login-field input{
+  width:100%;padding:12px 14px;border:1.5px solid #dce4ec;border-radius:10px;
+  font-size:.95rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--bg);transition:border-color .2s;
+}
+.login-field input:focus{border-color:var(--blue)}
+.login-field input.error{border-color:var(--red);animation:shake .3s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.login-error{color:var(--red);font-size:.8rem;margin-bottom:12px;display:none;text-align:center}
+.login-error.show{display:block}
+.btn-login{
+  width:100%;padding:14px;background:linear-gradient(135deg,#0746a8,#1a5fcc);
+  color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;
+  font-family:'DM Sans',sans-serif;cursor:pointer;transition:opacity .2s,transform .1s;
+}
+.btn-login:hover{opacity:.9}
+.btn-login:active{transform:scale(.98)}
+.login-footer{text-align:center;margin-top:20px;font-size:.72rem;color:#aab;letter-spacing:.3px}
+
+/* APP */
+#app{display:flex;flex-direction:column;height:100vh}
+#app.hidden{display:none}
+
+/* Header */
+header{
+  height:var(--header);background:linear-gradient(135deg,#05337a,#0746a8 60%,#1a5fcc);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;box-shadow:0 3px 14px rgba(7,70,168,.3);z-index:500;flex-shrink:0;
+}
+.h-brand{display:flex;align-items:center;gap:10px;color:#fff}
+.h-brand-text h2{font-size:.95rem;font-weight:700;color:#fff;line-height:1}
+.h-brand-text p{font-size:.65rem;letter-spacing:1.5px;color:rgba(255,255,255,.6);text-transform:uppercase}
+.h-right{display:flex;align-items:center;gap:8px}
+.btn-logout{
+  padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);
+  border-radius:20px;font-size:.78rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .2s;
+}
+.btn-logout:hover{background:rgba(255,255,255,.25)}
+.user-badge{font-size:.78rem;color:rgba(255,255,255,.7)}
+
+/* Main */
+.main{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar */
+#sidebar{width:var(--sidebar);background:#fff;border-right:1px solid #e4eaf3;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.sidebar-filters{padding:16px;border-bottom:1px solid #eef1f6;flex-shrink:0}
+.sidebar-title{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.sidebar-title::before{content:'';width:6px;height:6px;background:var(--blue);border-radius:50%;display:block}
+.filter-input{
+  width:100%;padding:9px 12px;border:1.5px solid #dce4ec;border-radius:8px;
+  font-size:.88rem;font-family:'DM Sans',sans-serif;outline:none;background:var(--bg);
+  margin-bottom:8px;transition:border-color .2s;
+}
+.filter-input:focus{border-color:var(--blue)}
+select.filter-input{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7a90'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.list-header{padding:10px 16px;font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eef1f6;flex-shrink:0}
+.list-count{background:var(--blue);color:#fff;padding:2px 8px;border-radius:10px;font-size:.68rem}
+#list{flex:1;overflow-y:auto}
+#list::-webkit-scrollbar{width:4px}
+#list::-webkit-scrollbar-thumb{background:#dde3ed;border-radius:2px}
+.list-item{padding:12px 16px;border-bottom:1px solid #f0f4fa;cursor:pointer;transition:background .15s;display:flex;align-items:flex-start;gap:10px}
+.list-item:hover{background:#f5f8ff}
+.list-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.list-info .item-name{font-size:.88rem;font-weight:600;color:var(--text);line-height:1.2}
+.list-info .item-meta{font-size:.75rem;color:var(--muted);margin-top:2px}
+.list-info .item-status{font-size:.7rem;font-weight:700;margin-top:3px}
+.status-activo{color:var(--green)}
+.status-noactivo{color:var(--red)}
+
+/* Map */
+#map{flex:1;z-index:1}
+
+/* Card */
+#card{
+  position:fixed;bottom:20px;left:calc(var(--sidebar) + 20px);
+  width:360px;background:#fff;border-radius:16px;
+  box-shadow:0 8px 40px rgba(7,70,168,.18);z-index:400;
+  transform:translateY(120%);transition:transform .3s cubic-bezier(.34,1.56,.64,1);overflow:hidden;
+}
+#card.open{transform:translateY(0)}
+.card-photo{width:100%;height:160px;object-fit:cover;display:block}
+.card-photo-placeholder{width:100%;height:160px;background:linear-gradient(135deg,#e8f0fb,#dce4ec);display:flex;align-items:center;justify-content:center}
+.card-photo-placeholder span{font-size:2.5rem;opacity:.3}
+.card-body{padding:16px}
+.card-status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:.68rem;font-weight:700;text-transform:uppercase;color:#fff;margin-bottom:8px}
+.card-name{font-size:1.15rem;font-weight:700;color:var(--blue);margin-bottom:4px;font-family:'DM Serif Display',serif}
+.card-address{font-size:.8rem;color:var(--muted);margin-bottom:12px}
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card-field{background:var(--bg);border-radius:8px;padding:8px 10px}
+.card-field-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px}
+.card-field-value{font-size:.88rem;font-weight:600;color:var(--text)}
+.card-close{position:absolute;top:10px;right:10px;width:30px;height:30px;background:rgba(0,0,0,.35);border:none;border-radius:50%;color:#fff;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* Legend */
+#legend{position:absolute;bottom:20px;right:20px;background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 4px 20px rgba(7,70,168,.12);z-index:400;min-width:150px}
+#legend h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px}
+.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:.75rem;color:var(--text)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* Loading */
+#loading{position:fixed;inset:0;background:rgba(7,70,168,.7);display:flex;align-items:center;justify-content:center;z-index:8000}
+#loading.hidden{display:none}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a4a;color:#fff;padding:10px 20px;border-radius:20px;font-size:.82rem;opacity:0;transition:all .3s;z-index:9000;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:768px){
+  #sidebar{display:none}
+  #card{left:10px;right:10px;width:auto;bottom:10px}
+  #legend{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div></div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-brand">
+      <h1>IslaPoint</h1>
+      <p>San Fernando · Cádiz</p>
+    </div>
+    <div class="login-field">
+      <label>Usuario</label>
+      <input type="text" id="loginUser" placeholder="Nombre de usuario" autocomplete="username"
+        onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="loginError">Usuario o contraseña incorrectos.</div>
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-footer">IslaPoint · Acceso restringido · Solo usuarios autorizados</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <div class="h-brand">
+      <div class="h-brand-text">
+        <h2>IslaPoint</h2>
+        <p>San Fernando · Cádiz</p>
+      </div>
+    </div>
+    <div class="h-right">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="sidebar">
+      <div class="sidebar-filters">
+        <div class="sidebar-title">Filtros</div>
+        <input class="filter-input" type="text" id="fBuscar" placeholder="Buscar por nombre..." oninput="applyFilters()">
+        <select class="filter-input" id="fActividad" onchange="applyFilters()">
+          <option value="">Todas las actividades</option>
+        </select>
+        <select class="filter-input" id="fEstado" onchange="applyFilters()">
+          <option value="">Estado (Todos)</option>
+          <option value="Activo">Activo</option>
+          <option value="No activo">No activo</option>
+        </select>
+      </div>
+      <div class="list-header">
+        <span>Establecimientos</span>
+        <span class="list-count" id="listCount">0</span>
+      </div>
+      <div id="list"></div>
+    </div>
+
+    <div style="position:relative;flex:1">
+      <div id="map"></div>
+      <div id="legend">
+        <h4>Leyenda</h4>
+        <div id="legendItems"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Card -->
+<div id="card">
+  <button class="card-close" onclick="closeCard()">✕</button>
+  <div id="cardPhotoWrap"></div>
+  <div class="card-body">
+    <div class="card-status-badge" id="cardStatus"></div>
+    <div class="card-name" id="cardName"></div>
+    <div class="card-address" id="cardAddress"></div>
+    <div class="card-grid">
+      <div class="card-field">
+        <div class="card-field-label">Actividad</div>
+        <div class="card-field-value" id="cardActividad"></div>
+      </div>
+      <div class="card-field">
+        <div class="card-field-label">Fachada</div>
+        <div class="card-field-value" id="cardFachada"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://fmdzzpvwcocgycabdtsm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_wXkbrZr3OhMEF35axgxI3Q_Q9h4BMyf';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let locales = [], filtrados = [], markers = {}, currentLoc = null, sessionUser = null;
+let map;
+
+// Colores por actividad
+const COLORS = {
+  'Hostelería':'#e67e22','Cafetería':'#e67e22','Restaurante':'#e67e22',
+  'Textil':'#e91e8c','Moda':'#e91e8c',
+  'Frutería':'#2ecc71','Alimentación':'#2ecc71','Supermercado':'#2ecc71','Panadería':'#2ecc71','Carnicería':'#27ae60','Pescadería':'#27ae60',
+  'Salud':'#00bcd4','Farmacia':'#00bcd4','Sanitaria':'#00bcd4',
+  'Estética':'#9c27b0','Peluquería':'#9c27b0',
+  'Banca':'#3f51b5','Bancaria':'#3f51b5',
+  'Zapatería':'#ff5722','Joyería':'#ffc107',
+  'Óptica':'#607d8b','Inmobiliaria':'#795548','Servicios':'#78909c',
+};
+
+function getColor(a) {
+  if (!a) return '#aab';
+  for (const k of Object.keys(COLORS)) if (a.toLowerCase().includes(k.toLowerCase())) return COLORS[k];
+  return '#0746a8';
+}
+
+// LOGIN
+async function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value.trim();
+  const errEl = document.getElementById('loginError');
+  if (!user || !pass) { errEl.textContent='Introduce usuario y contraseña.'; errEl.classList.add('show'); return; }
+  showLoading(true);
+  try {
+    const { data, error } = await _sb.from('usuarios').select('*')
+      .eq('nombre', user).eq('clave', pass).eq('activo', true).single();
+    if (error || !data) {
+      errEl.textContent = 'Usuario o contraseña incorrectos.';
+      errEl.classList.add('show');
+      ['loginUser','loginPass'].forEach(id => {
+        const el = document.getElementById(id);
+        el.classList.add('error');
+        setTimeout(() => el.classList.remove('error'), 500);
+      });
+      document.getElementById('loginPass').value = '';
+    } else {
+      sessionUser = data;
+      sessionStorage.setItem('islapoint_user', JSON.stringify(data));
+      await initApp();
+    }
+  } catch(e) {
+    errEl.textContent = 'Error de conexión.'; errEl.classList.add('show');
+  } finally { showLoading(false); }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('islapoint_user');
+  sessionUser = null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').classList.remove('show');
+}
+
+// INIT APP
+async function initApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userBadge').textContent = '👤 ' + sessionUser.nombre;
+  showLoading(true);
+  await loadLocales();
+  initMap();
+  buildLegend();
+  filtrados = [...locales];
+  render();
+  showLoading(false);
+}
+
+// CARGAR LOCALES
+async function loadLocales() {
+  const { data, error } = await _sb.from('locales').select('*').order('nombre', { ascending: true });
+  if (error) { toast('Error al cargar datos: ' + error.message); return; }
+  locales = (data || []).map(l => {
+    let lat = null, lng = null;
+    if (l.coordenadas) {
+      const p = String(l.coordenadas).split(',');
+      if (p.length >= 2) { lat = parseFloat(p[0]) || null; lng = parseFloat(p[1]) || null; }
+    }
+    const num = l.numero != null ? String(l.numero).replace(/\.0$/, '') : '';
+    return {
+      id: l.id, nombre: l.nombre || '', actividad: l.actividad || 'Sin clasificar',
+      estado: l.estado || 'No activo', fachada: parseFloat(l.fachada) || 0,
+      calle: l.calle || '', numero: num,
+      address: [l.calle, num].filter(Boolean).join(' '),
+      foto_url: l.foto_url || '', lat, lng
+    };
+  });
+
+  // Poblar actividades
+  const acts = [...new Set(locales.map(l => l.actividad).filter(Boolean))].sort();
+  const sel = document.getElementById('fActividad');
+  sel.innerHTML = '<option value="">Todas las actividades</option>';
+  acts.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; sel.appendChild(o); });
+}
+
+// MAPA
+function initMap() {
+  if (map) return;
+  map = L.map('map').setView([36.4676, -6.1972], 15);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution:'© OpenStreetMap · © CARTO', maxZoom:19
+  }).addTo(map);
+  map.on('click', () => closeCard());
+}
+
+function render() {
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  markers = {};
+  filtrados.forEach(loc => {
+    if (!loc.lat || !loc.lng) return;
+    const color = getColor(loc.actividad);
+    const vacant = /vacío|vacio|cerrada/i.test(loc.nombre);
+    const m = L.circleMarker([loc.lat, loc.lng], {
+      radius:7, fillColor:color, color:'#fff', weight:2, opacity:1, fillOpacity: vacant ? 0.4 : 0.9
+    }).addTo(map);
+    m.on('click', e => { e.originalEvent.stopPropagation(); showCard(loc); });
+    markers[loc.id] = m;
+  });
+  renderList();
+}
+
+function renderList() {
+  document.getElementById('listCount').textContent = filtrados.length;
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  filtrados.forEach(loc => {
+    const activo = loc.estado === 'Activo';
+    const div = document.createElement('div');
+    div.className = 'list-item';
+    div.innerHTML = `
+      <div class="list-dot" style="background:${getColor(loc.actividad)}"></div>
+      <div class="list-info">
+        <div class="item-name">${loc.nombre}</div>
+        <div class="item-meta">${loc.actividad} · ${loc.address || '—'}</div>
+        <div class="item-status ${activo?'status-activo':'status-noactivo'}">● ${activo?'ACTIVO':'NO ACTIVO'}</div>
+      </div>`;
+    div.onclick = () => {
+      if (loc.lat && loc.lng) map.flyTo([loc.lat, loc.lng], 18, {animate:true,duration:1});
+      showCard(loc);
+    };
+    list.appendChild(div);
+  });
+}
+
+// FILTROS
+function applyFilters() {
+  const buscar = document.getElementById('fBuscar').value.toLowerCase();
+  const activ  = document.getElementById('fActividad').value;
+  const estado = document.getElementById('fEstado').value;
+  filtrados = locales.filter(l => {
+    if (buscar && !l.nombre.toLowerCase().includes(buscar)) return false;
+    if (activ  && l.actividad !== activ) return false;
+    if (estado && l.estado !== estado) return false;
+    return true;
+  });
+  render();
+}
+
+// FICHA
+function showCard(loc) {
+  currentLoc = loc;
+  const activo = loc.estado === 'Activo';
+  const wrap = document.getElementById('cardPhotoWrap');
+  wrap.innerHTML = loc.foto_url
+    ? `<img class="card-photo" src="${loc.foto_url}" alt="${loc.nombre}" onerror="this.parentElement.innerHTML='<div class=card-photo-placeholder><span>🏪</span></div>'">`
+    : `<div class="card-photo-placeholder"><span>🏪</span></div>`;
+  const st = document.getElementById('cardStatus');
+  st.textContent = activo ? 'Activo' : 'No activo';
+  st.style.background = activo ? '#1db87a' : '#e5534b';
+  document.getElementById('cardName').textContent = loc.nombre;
+  document.getElementById('cardAddress').textContent = loc.address || '—';
+  document.getElementById('cardActividad').textContent = loc.actividad || '—';
+  document.getElementById('cardFachada').textContent = loc.fachada ? loc.fachada + ' m' : '—';
+  document.getElementById('card').classList.add('open');
+}
+
+function closeCard() { document.getElementById('card').classList.remove('open'); }
+
+// LEYENDA
+function buildLegend() {
+  const groups = {
+    'Hostelería':'#e67e22','Textil / Moda':'#e91e8c','Alimentación':'#2ecc71',
+    'Salud':'#00bcd4','Belleza':'#9c27b0','Bancaria':'#3f51b5',
+    'Otros':'#0746a8','Vacío / Cerrado':'#aab'
+  };
+  document.getElementById('legendItems').innerHTML =
+    Object.entries(groups).map(([l,c]) =>
+      `<div class="leg-item"><div class="leg-dot" style="background:${c}"></div>${l}</div>`
+    ).join('');
+}
+
+function showLoading(v) { document.getElementById('loading').classList.toggle('hidden', !v); }
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ARRANQUE
+(async function() {
+  showLoading(false);
+  const saved = sessionStorage.getItem('islapoint_user');
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      const { data } = await _sb.from('usuarios').select('*').eq('id', u.id).eq('activo', true).single();
+      if (data) { sessionUser = data; await initApp(); return; }
+    } catch(e) {}
+    sessionStorage.removeItem('islapoint_user');
+  }
+})();
+</script>
+</body>
+</html>
