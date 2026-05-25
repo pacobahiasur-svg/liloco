@@ -204,6 +204,12 @@ select.filter-input{cursor:pointer;appearance:none;background-image:url("data:im
       <div class="sidebar-filters">
         <div class="sidebar-title">Filtros</div>
         <input class="filter-input" type="text" id="fBuscar" placeholder="Buscar por nombre..." oninput="applyFilters()">
+        <select class="filter-input" id="fCalle" onchange="applyFilters()">
+          <option value="">Todas las calles</option>
+          <option value="C/ Real">C/ Real</option>
+          <option value="C/ Rosario">C/ Rosario</option>
+          <option value="C/ San Rafael">C/ San Rafael</option>
+        </select>
         <select class="filter-input" id="fActividad" onchange="applyFilters()">
           <option value="">Todas las actividades</option>
         </select>
@@ -258,7 +264,7 @@ const SUPABASE_URL = 'https://fmdzzpvwcocgycabdtsm.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_wXkbrZr3OhMEF35axgxI3Q_Q9h4BMyf';
 const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let locales = [], filtrados = [], markers = {}, currentLoc = null, sessionUser = null;
+let locales = [], filtrados = [], markers = {}, currentLoc = null, sessionUser = null, selectedMarker = null, pendingLocId = null;
 let map;
 
 // Colores por actividad
@@ -342,7 +348,7 @@ async function loadLocales() {
     let lat = null, lng = null;
     if (l.coordenadas) {
       const p = String(l.coordenadas).split(',');
-      if (p.length >= 2) { lat = parseFloat(p[0]) || null; lng = parseFloat(p[1]) || null; }
+      if (p.length >= 2) { lat = parseFloat(p[0].trim()) || null; lng = parseFloat(p[1].trim()) || null; }
     }
     const num = l.numero != null ? String(l.numero).replace(/\.0$/, '') : '';
     return {
@@ -362,9 +368,11 @@ async function loadLocales() {
 }
 
 // MAPA
+let markersGroup;
 function initMap() {
   if (map) return;
   map = L.map('map').setView([36.4676, -6.1972], 15);
+  markersGroup = L.layerGroup().addTo(map);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom:19
@@ -374,19 +382,80 @@ function initMap() {
 }
 
 function render() {
-  Object.values(markers).forEach(m => map.removeLayer(m));
+  pendingLocId = null;
+  // Limpiar todo el grupo de markers
+  markersGroup.clearLayers();
   markers = {};
+  selectedMarker = null;
+
   filtrados.forEach(loc => {
     if (!loc.lat || !loc.lng) return;
     const color = getColor(loc.actividad);
     const vacant = /vacío|vacio|cerrada/i.test(loc.nombre);
     const m = L.circleMarker([loc.lat, loc.lng], {
-      radius:7, fillColor:color, color:'#fff', weight:2, opacity:1, fillOpacity: vacant ? 0.4 : 0.9
-    }).addTo(map);
-    m.on('click', e => { L.DomEvent.stopPropagation(e); showCard(loc); });
-    markers[loc.id] = m;
+      radius:7, fillColor:color, color:'#fff', weight:2, opacity:1,
+      fillOpacity: vacant ? 0.35 : 0.9
+    });
+    m._islaLoc = loc;
+    m.on('click', e => {
+      L.DomEvent.stopPropagation(e);
+      selectLoc(loc);
+    });
+    markersGroup.addLayer(m);
+    markers[String(loc.id)] = m;
   });
+
   renderList();
+}
+
+function makeStarIcon(color) {
+  return L.divIcon({
+    className:'',
+    html:`<div style="font-size:44px;line-height:1;color:${color};-webkit-text-stroke:2px #fff;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">★</div>`,
+    iconSize:[48,48], iconAnchor:[24,24]
+  });
+}
+
+function restorePrevMarker() {
+  if (!selectedMarker) return;
+  const prev = selectedMarker._islaLoc;
+  if (prev) {
+    const color = getColor(prev.actividad);
+    const vacant = /vacío|vacio|cerrada/i.test(prev.nombre);
+    const restored = L.circleMarker([prev.lat, prev.lng], {
+      radius:7, fillColor:color, color:'#fff', weight:2, opacity:1,
+      fillOpacity: vacant ? 0.35 : 0.9
+    });
+    restored._islaLoc = prev;
+    restored.on('click', e => { L.DomEvent.stopPropagation(e); selectLoc(prev); });
+    markersGroup.removeLayer(selectedMarker);
+    markersGroup.addLayer(restored);
+    markers[String(prev.id)] = restored;
+  }
+  selectedMarker = null;
+}
+
+function selectLoc(loc) {
+  // Cancelar cualquier moveend pendiente
+
+  // Restaurar marker anterior
+  restorePrevMarker();
+
+  // Poner estrella inmediatamente
+  const mk = markers[String(loc.id)];
+  if (mk) {
+    const color = getColor(loc.actividad);
+    const star = L.marker([loc.lat, loc.lng], {icon: makeStarIcon(color)});
+    star._islaLoc = loc;
+    star.on('click', e => { L.DomEvent.stopPropagation(e); selectLoc(loc); });
+    markersGroup.removeLayer(mk);
+    markersGroup.addLayer(star);
+    markers[String(loc.id)] = star;
+    selectedMarker = star;
+  }
+
+  showCard(loc);
+  map.flyTo([loc.lat, loc.lng], 19, {animate:true, duration:2.5, easeLinearity:0.1});
 }
 
 function renderList() {
@@ -405,8 +474,7 @@ function renderList() {
         <div class="item-status ${activo?'status-activo':'status-noactivo'}">● ${activo?'ACTIVO':'NO ACTIVO'}</div>
       </div>`;
     div.onclick = () => {
-      if (loc.lat && loc.lng) map.flyTo([loc.lat, loc.lng], 18, {animate:true,duration:1});
-      showCard(loc);
+      selectLoc(loc);
     };
     list.appendChild(div);
   });
@@ -415,15 +483,29 @@ function renderList() {
 // FILTROS
 function applyFilters() {
   const buscar = document.getElementById('fBuscar').value.toLowerCase();
+  const calle  = document.getElementById('fCalle').value;
   const activ  = document.getElementById('fActividad').value;
   const estado = document.getElementById('fEstado').value;
+
   filtrados = locales.filter(l => {
     if (buscar && !l.nombre.toLowerCase().includes(buscar)) return false;
+    if (calle  && l.calle !== calle) return false;
     if (activ  && l.actividad !== activ) return false;
     if (estado && l.estado !== estado) return false;
     return true;
   });
+
+  // Resetear selección
+  closeCard();
+
   render();
+
+  // Ajustar mapa a los puntos filtrados con coordenadas
+  const conCoords = filtrados.filter(l => l.lat && l.lng);
+  if (conCoords.length > 0) {
+    const bounds = L.latLngBounds(conCoords.map(l => [l.lat, l.lng]));
+    map.flyToBounds(bounds, {padding:[60,60], animate:true, duration:1.5, easeLinearity:0.2, minZoom:14, maxZoom:18});
+  }
 }
 
 // FICHA
@@ -444,7 +526,13 @@ function showCard(loc) {
   document.getElementById('card').classList.add('open');
 }
 
-function closeCard() { document.getElementById('card').classList.remove('open'); }
+
+
+function closeCard() {
+  document.getElementById('card').classList.remove('open');
+  pendingLocId = null;
+  restorePrevMarker();
+}
 
 // LEYENDA
 function buildLegend() {
