@@ -150,10 +150,55 @@ select.filter-input{cursor:pointer;appearance:none;background-image:url("data:im
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2a4a;color:#fff;padding:10px 20px;border-radius:20px;font-size:.82rem;opacity:0;transition:all .3s;z-index:9000;pointer-events:none}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ── MOBILE ─────────────────────────────────────────────── */
 @media(max-width:768px){
-  #sidebar{display:none}
-  #card{left:10px;right:10px;width:auto;bottom:10px}
+  /* Sidebar como panel deslizante */
+  #sidebar{
+    position:fixed;top:var(--header);left:0;bottom:0;
+    width:100%;max-width:100%;z-index:600;
+    transform:translateX(-100%);transition:transform .3s ease;
+    box-shadow:4px 0 20px rgba(7,70,168,.15);
+  }
+  #sidebar.open{transform:translateX(0)}
+
+  /* Botón filtros flotante */
+  #btnFiltros{
+    display:flex;align-items:center;gap:6px;
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--blue);color:#fff;border:none;border-radius:24px;
+    padding:12px 22px;font-size:.88rem;font-weight:700;
+    font-family:'DM Sans',sans-serif;cursor:pointer;z-index:700;
+    box-shadow:0 4px 18px rgba(7,70,168,.4);
+  }
+  #btnFiltros.has-filters{background:#e67e22}
+
+  /* Card mobile — bottom sheet */
+  #card{
+    position:fixed;left:0;right:0;bottom:0;width:100%;
+    border-radius:16px 16px 0 0;
+    transform:translateY(100%);
+  }
+  #card.open{transform:translateY(0)}
+
+  /* Ocultar legend en móvil */
   #legend{display:none}
+
+  /* Overlay para cerrar sidebar */
+  #sidebarOverlay{
+    display:none;position:fixed;inset:0;
+    background:rgba(0,0,0,.4);z-index:590;
+  }
+  #sidebarOverlay.open{display:block}
+
+  /* Header más compacto */
+  .h-brand-text p{display:none}
+  .user-badge{display:none}
+}
+
+/* ── DESKTOP ─────────────────────────────────────────────── */
+@media(min-width:769px){
+  #btnFiltros{display:none}
+  #sidebarOverlay{display:none !important}
 }
 </style>
 </head>
@@ -235,6 +280,14 @@ select.filter-input{cursor:pointer;appearance:none;background-image:url("data:im
     </div>
   </div>
 </div>
+
+<!-- Overlay sidebar móvil -->
+<div id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Botón filtros móvil -->
+<button id="btnFiltros" onclick="toggleSidebar()">
+  <span>🔍</span> Filtros
+</button>
 
 <!-- Card -->
 <div id="card">
@@ -474,6 +527,7 @@ function renderList() {
         <div class="item-status ${activo?'status-activo':'status-noactivo'}">● ${activo?'ACTIVO':'NO ACTIVO'}</div>
       </div>`;
     div.onclick = () => {
+      closeSidebar();
       selectLoc(loc);
     };
     list.appendChild(div);
@@ -486,6 +540,11 @@ function applyFilters() {
   const calle  = document.getElementById('fCalle').value;
   const activ  = document.getElementById('fActividad').value;
   const estado = document.getElementById('fEstado').value;
+
+  // Actualizar badge botón filtros
+  const hayFiltros = !!(buscar || calle || activ || estado);
+  const btnF = document.getElementById('btnFiltros');
+  if (btnF) btnF.classList.toggle('has-filters', hayFiltros);
 
   filtrados = locales.filter(l => {
     if (buscar && !l.nombre.toLowerCase().includes(buscar)) return false;
@@ -546,6 +605,20 @@ function buildLegend() {
       `<div class="leg-item"><div class="leg-dot" style="background:${c}"></div>${l}</div>`
     ).join('');
 }
+
+function toggleSidebar() {
+  const s = document.getElementById('sidebar');
+  const o = document.getElementById('sidebarOverlay');
+  const open = s.classList.toggle('open');
+  o.classList.toggle('open', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// Cerrar sidebar al aplicar filtro en móvil
+const _origApplyFilters = applyFilters;
 
 function showLoading(v) { document.getElementById('loading').classList.toggle('hidden', !v); }
 function toast(msg) {
