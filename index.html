@@ -287,8 +287,8 @@ async function doLogin() {
   showLoading(true);
   try {
     const { data, error } = await _sb.from('usuarios').select('*')
-      .eq('nombre', user).eq('clave', pass).eq('activo', true).single();
-    if (error || !data) {
+      .eq('nombre', user).eq('clave', pass).eq('activo', true);
+    if (error || !data || data.length === 0) {
       errEl.textContent = 'Usuario o contraseña incorrectos.';
       errEl.classList.add('show');
       ['loginUser','loginPass'].forEach(id => {
@@ -298,7 +298,7 @@ async function doLogin() {
       });
       document.getElementById('loginPass').value = '';
     } else {
-      sessionUser = data;
+      sessionUser = data[0];
       sessionStorage.setItem('islapoint_user', JSON.stringify(data));
       await initApp();
     }
@@ -468,8 +468,12 @@ function toast(msg) {
   if (saved) {
     try {
       const u = JSON.parse(saved);
-      const { data } = await _sb.from('usuarios').select('*').eq('id', u.id).eq('activo', true).single();
-      if (data) { sessionUser = data; await initApp(); return; }
+      const { data, error } = await _sb.from('usuarios').select('*').eq('id', u.id).eq('activo', true);
+      if (!error && data && data.length > 0) {
+        sessionUser = data[0];
+        await initApp();
+        return;
+      }
     } catch(e) {}
     sessionStorage.removeItem('islapoint_user');
   }
